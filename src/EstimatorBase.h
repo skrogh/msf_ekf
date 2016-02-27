@@ -34,6 +34,7 @@ public:
 			Eigen::Quaterniond &q_i_w_,
 			Eigen::Vector3d &omega_i,
 			Eigen::Vector3d &a_i);
+	Eigen::Matrix<double,31,1> GetStateVector(void);
 
 
 // protected:
@@ -72,7 +73,7 @@ public:
 	void PropagateCovariance(const Eigen::Vector3d &omega_m, const Eigen::Vector3d &a_m);
 	void UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaterniond &q_c_v, const Eigen::Matrix<double,6,6> &R);
 	void UpdateKeyframe(void);
-
+	Eigen::Matrix<double,28,1> GetCovarianceDiagonal(void);
 
 //protected:
 	// Covariance

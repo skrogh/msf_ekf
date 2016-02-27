@@ -63,13 +63,16 @@ EstimatorPredictor::SetState(const Eigen::Vector3d &p_i_w_,
 	p_i_w = p_i_w_;
 	v_i_w = v_i_w_;
 	q_i_w = q_i_w_;
+	q_i_w.normalize();
 	b_omega = b_omega_;
 	b_a = b_a_;
 	lambda = lambda_;
 	p_c_i = p_c_i_;
 	q_c_i = q_c_i_;
+	q_c_i.normalize();
 	p_w_v = p_w_v_;
 	q_w_v = q_w_v_;
+	q_w_v.normalize();
 }
 
 void
@@ -144,6 +147,14 @@ EstimatorPredictor::GetState(Eigen::Vector3d &p_i_w_,
 	a_i = a_m_old - b_a;
 }
 
+Eigen::Matrix<double,31,1>
+EstimatorPredictor::GetStateVector(void)
+{
+	Eigen::Matrix<double,31,1> X;
+	X << p_i_w, v_i_w, q_i_w.coeffs(), b_omega, b_a, lambda, p_c_i, q_c_i.coeffs(), p_w_v, q_w_v.coeffs();
+	return X;
+}
+
 EstimatorFull::EstimatorFull()
 {
 	// Covariance
@@ -166,6 +177,12 @@ void
 EstimatorFull::SetCovarianceDiagonal(const Eigen::Matrix<double,28,1> &P_)
 {
 	P = P_.asDiagonal();
+}
+
+Eigen::Matrix<double,28,1>
+EstimatorFull::GetCovarianceDiagonal(void)
+{
+	return P.diagonal();
 }
 
 
@@ -259,27 +276,27 @@ EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaternio
 	H_p <<
 	C_q_w_v.transpose() * exp(lambda),
 	Matrix3d::Zero(),
-	-C_q_w_v.transpose()*C_q_i_w.transpose()*crossMat(p_c_i)*exp(lambda),
+	-C_q_w_v.transpose()*C_q_i_w.transpose()*crossMat(p_c_i)*exp(lambda),//
 	Matrix3d::Zero(),
 	Matrix3d::Zero(),
-	(C_q_w_v.transpose()*C_q_i_w.transpose()*p_c_i + C_q_w_v.transpose()*p_i_w + p_w_v) * exp(lambda),
+	(C_q_w_v.transpose()*(C_q_i_w.transpose()*p_c_i + p_i_w) + p_w_v) * exp(lambda),
 	C_q_w_v.transpose()*C_q_i_w.transpose()*exp(lambda),
 	Matrix3d::Zero(),
 	Matrix3d::Identity()*exp(lambda),
-	-C_q_w_v.transpose()*crossMat( p_i_w + C_q_i_w.transpose()*p_c_i )*exp(lambda);
+	-C_q_w_v.transpose()*crossMat( p_i_w + C_q_i_w.transpose()*p_c_i )*exp(lambda);//
 
 	Matrix<double,3,28> H_q;
 	H_q <<
 	Matrix3d::Zero(),
 	Matrix3d::Zero(),
-	C_q_c_i,
+	-C_q_c_i,
 	Matrix3d::Zero(),
 	Matrix3d::Zero(),
 	Vector3d::Zero(),
 	Matrix3d::Zero(),
-	Matrix3d::Identity(),
+	-Matrix3d::Identity(),
 	Matrix3d::Zero(),
-	C_q_c_i*C_q_i_w;
+	-C_q_c_i*C_q_i_w;
 
 	Matrix<double,6,28> H;
 	H << H_p, H_q;
@@ -287,7 +304,7 @@ EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaternio
 	// Calculate residual
 
 	Vector3d r_p = p_c_v - ( C_q_w_v.transpose()*(p_i_w + C_q_i_w.transpose()*p_c_i) + p_w_v ) * exp(lambda);
-	Quaterniond r_q = q_c_v*( q_c_i*q_i_w*q_w_v ).conjugate();
+	Quaterniond r_q = (q_c_v*( q_c_i*q_i_w*q_w_v ).conjugate());
 
 	Matrix<double,6,1> r;
 	r << r_p, 2*r_q.x(), 2*r_q.y(), 2*r_q.z();
@@ -316,6 +333,7 @@ EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaternio
 void inline 
 EstimatorFull::ApplyCorrection( const Eigen::Matrix<double,28,1> &x_error ) 
 {
+	// TODO: look at quaternion error propagation. it smells
 	p_i_w += x_error.segment<3>(0);
 	v_i_w += x_error.segment<3>(3);	
 	q_i_w = Quaterniond( 1, x_error(6)/2.0, x_error(7)/2.0, x_error(8)/2.0 )*q_i_w; q_i_w.normalize();

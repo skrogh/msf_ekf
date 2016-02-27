@@ -17,7 +17,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^x86_64" )
 
 	# Also add some useful compiler flag
 	set(CMAKE_CXX_FLAGS
-	   "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -march=native  -std=c++0x"
+	   "${CMAKE_CXX_FLAGS} -O2 ${SSE_FLAGS} -march=native  -std=c++0x"
 	)
 endif()
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
