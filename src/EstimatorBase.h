@@ -4,6 +4,25 @@
 #include <Eigen/SparseCore>
 #include <Eigen/Geometry> 
 
+namespace Eigen
+{
+	template<typename _Scalar>
+class QuaternionAlias
+{
+	public:
+		Quaternion<_Scalar> q;
+		QuaternionAlias( void ) { }
+		QuaternionAlias( _Scalar w, _Scalar x, _Scalar y, _Scalar z ) { q = Quaternion<_Scalar>( w, -x, -y, -z ); }
+		QuaternionAlias( const Quaternion<_Scalar> & q_ ) { q = q_.conjugate(); }
+		Quaternion<_Scalar> toQuat() { return q.conjugate(); }
+		Quaternion<_Scalar>& getRaw() { return q; }
+		void normalize() { q.normalize(); }
+};
+
+typedef QuaternionAlias<float> QuaternionAf;
+typedef QuaternionAlias<double> QuaternionAd;
+
+}
 
 namespace ekf
 {
@@ -41,14 +60,14 @@ public:
 	// States:
 	Eigen::Vector3d p_i_w;
 	Eigen::Vector3d v_i_w;
-	Eigen::Quaterniond q_i_w;
+	Eigen::QuaternionAd q_i_w;
 	Eigen::Vector3d b_omega;
 	Eigen::Vector3d b_a;
 	double lambda;
 	Eigen::Vector3d p_c_i;
-	Eigen::Quaterniond q_c_i;
+	Eigen::QuaternionAd q_c_i;
 	Eigen::Vector3d p_w_v;
-	Eigen::Quaterniond q_w_v;
+	Eigen::QuaternionAd q_w_v;
 
 	// Calibration parameters
 	double sq_sigma_omega;
@@ -71,7 +90,9 @@ public:
 	// void PropagateState(const Eigen::Vector3d &omega_m, const Eigen::Vector3d &a_m); USE SUPERCLASS METHOD
 	void SetCovarianceDiagonal(const Eigen::Matrix<double,28,1> &P_);
 	void PropagateCovariance(const Eigen::Vector3d &omega_m, const Eigen::Vector3d &a_m);
-	void UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaterniond &q_c_v, const Eigen::Matrix<double,6,6> &R);
+	void UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaterniond &q_c_v,
+		const Eigen::Matrix<double,6,6> &R,
+		bool absolute, bool isKeyframe=false, double dLambda=0 );
 	void UpdateKeyframe(void);
 	Eigen::Matrix<double,28,1> GetCovarianceDiagonal(void);
 
@@ -82,6 +103,10 @@ public:
 //private:
 	// Helper functions
 	void ApplyCorrection(const Eigen::Matrix<double,28,1> &x);
+
+	// Saved for calculating keyframe increments form absolute path
+	Eigen::Vector3d p_kf_v;
+	Eigen::QuaternionAd q_kf_v;
 
 };
 

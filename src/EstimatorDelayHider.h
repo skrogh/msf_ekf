@@ -48,7 +48,9 @@ public:
 			double sq_sigma_b_omega_,
 			double sq_sigma_b_a_,
 			double Delta_t_,
-			const Eigen::Vector3d &g_);
+			const Eigen::Vector3d &g_,
+			double Delta_lambda_,
+			bool absolute_);
 	void Start(void);
 	void GetState(Eigen::Vector3d &p_i_w_,
 			Eigen::Vector3d &v_i_w_,
@@ -67,6 +69,10 @@ public:
 
 
 //protected:
+	// Calibration values
+	double Delta_lambda;
+	bool absolute;
+
 	// Buffers
 	ConcurrentQueue<imuData_t> imuInBuffer;
 	ConcurrentQueue<cameraData_t> cameraInBuffer;

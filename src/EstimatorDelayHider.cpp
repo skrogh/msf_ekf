@@ -55,8 +55,12 @@ EstimatorDelayHider::SetCalibration(double sq_sigma_omega_,
 		double sq_sigma_b_omega_,
 		double sq_sigma_b_a_,
 		double Delta_t_,
-		const Eigen::Vector3d &g_)
+		const Eigen::Vector3d &g_,
+		double Delta_lambda_,
+		bool absolute_)
 {
+	Delta_lambda = Delta_lambda_;
+	absolute = absolute_;
 	boost::mutex::scoped_lock lock(estimatorFullMutex);
 	estimatorFull.SetCalibration(sq_sigma_omega_, sq_sigma_a_,
 			sq_sigma_b_omega_, sq_sigma_b_a_, Delta_t_, g_);
@@ -178,11 +182,8 @@ EstimatorDelayHider::EstimatorThread(void)
 
 		// Do update from camera
 		boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
-		estimatorFull.UpdateCamera(cameraData.p_c_v, cameraData.q_c_v, cameraData.R);
-		if (cameraData.isNewKeyframe)
-		{
-			estimatorFull.UpdateKeyframe();
-		}
+		estimatorFull.UpdateCamera(cameraData.p_c_v, cameraData.q_c_v, cameraData.R,
+			absolute, cameraData.isNewKeyframe, Delta_lambda);
 		lockEstimator.unlock();
 
 
