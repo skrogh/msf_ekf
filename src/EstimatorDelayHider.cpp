@@ -1,6 +1,23 @@
 #include "EstimatorDelayHider.h"
 #include <iostream>
+#include <boost/circular_buffer.hpp>
 
+#include <unistd.h>
+#include <sys/syscall.h>
+
+// Helper function for signum
+template <typename T> int sgn(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
+double calcLambda(double S_xx, double S_yy, double S_xy,
+	double sigma_x, double sigma_y)
+{
+	S_xx *= sigma_y*sigma_y;
+	S_yy *= sigma_x*sigma_x;
+	S_xy *= sigma_x*sigma_y;
+	return (S_xx - S_yy + sgn(S_xy)*sqrt( (S_xx - S_yy)*(S_xx - S_yy) + 4*S_xy*S_xy)) / (2/sigma_x*sigma_y*S_xy);
+}
 
 namespace ekf
 {
@@ -85,12 +102,14 @@ EstimatorDelayHider::CameraMeasurement(const Eigen::Vector3d &p_c_v,
 
 void
 EstimatorDelayHider::ImuMeasurement(const Eigen::Vector3d &omega_m,
-			const Eigen::Vector3d &a_m, double timeStamp)
+			const Eigen::Vector3d &a_m, double dist, bool distValid, double timeStamp)
 {
 	// Construct buffer object
 	imuData_t data;
 	data.omega_m = omega_m;
 	data.a_m = a_m;
+	data.dist = dist;
+	data.distValid = distValid;
 	data.timeStamp = timeStamp;
 
 	// Check if predictor finished
@@ -134,7 +153,25 @@ EstimatorDelayHider::GetState(Eigen::Vector3d &p_i_w_,
 void
 EstimatorDelayHider::EstimatorThread(void)
 {
-	std::cout << "Estimator thread started" << std::endl;
+	bool initialized = false;
+	std::clog << "Estimator thread started. PID: " << (int) syscall(SYS_gettid) << std::endl;
+
+	// Local variables for scale estimation
+	int numValidDist = 0;
+	double distanceBuffer[50];
+
+	int windowSize = 10;
+	boost::circular_buffer<double> distanceRing(windowSize);
+	boost::circular_buffer<Eigen::Vector3d> p_c_vRing(windowSize);
+	boost::circular_buffer<Eigen::QuaternionAd> q_w_vRing(windowSize);
+	double S_xx = 0;
+	double S_yy = 0;
+	double S_xy = 0;
+
+	double sigma_x = 1;
+	double sigma_y = 1;
+	double tau = 1 - 1/200;	
+
 	while ( 1 )
 	{
 		boost::mutex::scoped_lock lockExit(threadsShouldExitMutex);
@@ -147,10 +184,10 @@ EstimatorDelayHider::EstimatorThread(void)
 
 		// Propagate up to new measurement
 		bool skip = false;
+		imuData_t imuData;
 		while(true)
 		{
 			// Get latest imu
-			imuData_t imuData;
 			if (!imuInBuffer.peek(imuData))
 			{
 				std::cerr << "ESTIMATOR THREAD ERROR! IMU buffer empty after getting new camera image, this should not happen!" << std::endl
@@ -171,19 +208,78 @@ EstimatorDelayHider::EstimatorThread(void)
 				break;
 			}
 
-			// Lock the estimator object and propagate
-			boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
-			estimatorFull.PropagateState( imuData.omega_m, imuData.a_m );
-			estimatorFull.PropagateCovariance( imuData.omega_m, imuData.a_m );
-			lockEstimator.unlock();
+			if (initialized) //skip untill first measurment
+			{
+				// Lock the estimator object and propagate
+				boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
+				estimatorFull.PropagateState( imuData.omega_m, imuData.a_m );
+				estimatorFull.PropagateCovariance( imuData.omega_m, imuData.a_m );
+				lockEstimator.unlock();
+				if (imuData.distValid)
+					distanceBuffer[numValidDist++] = imuData.dist;
+			}
 		}
 		if (skip)
 			continue;
+
+		initialized = true;
 
 		// Do update from camera
 		boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
 		estimatorFull.UpdateCamera(cameraData.p_c_v, cameraData.q_c_v, cameraData.R,
 			absolute, cameraData.isNewKeyframe, Delta_lambda);
+		
+		static int i = 0;
+		if (i++%1==0)
+		{
+			Eigen::QuaternionAd q_c_kf(cameraData.q_c_v.conjugate() * estimatorFull.q_kf_v.toQuat().conjugate());
+    		Eigen::Vector3d p_c_kf = estimatorFull.q_kf_v.toQuat().toRotationMatrix() * (cameraData.p_c_v - estimatorFull.p_kf_v);
+	    	Eigen::Matrix3d C_q_w_v = estimatorFull.q_w_v.toQuat().toRotationMatrix();
+			Eigen::Matrix3d C_q_i_w = estimatorFull.q_i_w.toQuat().toRotationMatrix();
+			Eigen::Matrix3d C_q_c_i = estimatorFull.q_c_i.toQuat().toRotationMatrix();
+
+	    	std::cout << estimatorFull.p_i_w.transpose() << " " << estimatorFull.q_i_w.q.coeffs().transpose() << " "
+	   			<< estimatorFull.p_w_v.transpose() << " " << estimatorFull.q_w_v.q.coeffs().transpose() << " "
+	    		<< estimatorFull.lambda << " " << exp(estimatorFull.lambda) << " "
+	    		<< imuData.timeStamp << " "
+	    		<< cameraData.timeStamp << " "
+	    		<< estimatorFull.GetStateVector().transpose() << " " << estimatorFull.GetCovarianceDiagonal().transpose() << " "
+	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) + estimatorFull.p_w_v ).transpose() * exp(estimatorFull.lambda) << " "
+	    		<< (estimatorFull.q_c_i.toQuat()*estimatorFull.q_i_w.toQuat()*estimatorFull.q_w_v.toQuat()).conjugate().coeffs().transpose() << " "
+	    		<< p_c_v.transpose() << " "
+	    		<< std::endl;
+
+		}
+
+	   	Eigen::QuaternionAd q_w_v( ( estimatorFull.q_c_i.toQuat() * estimatorFull.q_i_w.toQuat() ).conjugate() * cameraData.q_c_v.conjugate() );
+		Eigen::Vector3d p_c_w = q_w_v.toQuat().toRotationMatrix() * cameraData.p_c_v;
+
+		if (numValidDist)
+		{
+			distanceRing.push_back(distanceBuffer[numValidDist-1]);
+			p_c_vRing.push_back(cameraData.p_c_v);
+			q_w_vRing.push_back(q_w_v);
+		}
+
+	    if (distanceRing.full()&& numValidDist)
+	    {
+	    	double x_ = distanceRing.back() - distanceRing.front();
+	    	Eigen::Vector3d y_ =  q_w_vRing.back().toQuat().toRotationMatrix()*(p_c_vRing.back() - p_c_vRing.front());
+
+	    	S_xx = S_xx*tau + x_*x_;
+	    	S_yy = S_yy*tau + y_(2)*y_(2);
+	    	S_xy = S_xy*tau + x_*y_(2);
+	    	
+
+	    	double lambda = calcLambda(S_xx, S_yy, S_xy, sigma_x, sigma_y);
+
+	    	// Apply lambda "measurement"
+	   		estimatorFull.lambda = lambda;
+
+	    }
+	    numValidDist = 0;
+
+
 		lockEstimator.unlock();
 
 
@@ -200,13 +296,13 @@ EstimatorDelayHider::EstimatorThread(void)
 		lockPredictor.unlock();
 	}
 
-	std::cout << "Estimator thread ending" << std::endl;
+	std::clog << "Estimator thread ending" << std::endl;
 }
 
 void
 EstimatorDelayHider::PredictorThread(void)
 {
-	std::cout << "Predictor thread started" << std::endl;
+	std::clog << "Predictor thread started. PID: " << (int) syscall(SYS_gettid) << std::endl;
 	while ( 1 )
 	{
 		boost::mutex::scoped_lock lockExit(threadsShouldExitMutex);
@@ -226,7 +322,7 @@ EstimatorDelayHider::PredictorThread(void)
 	}
 
 
-	std::cout << "Predictor thread ending" << std::endl;
+	std::clog << "Predictor thread ending" << std::endl;
 }
 
 

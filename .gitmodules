@@ -1,0 +1,3 @@
+[submodule "external/concurrentBuffers"]
+	path = external/concurrentBuffers
+	url = https://github.com/skrogh/concurrentBuffers.git

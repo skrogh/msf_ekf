@@ -104,7 +104,7 @@ public:
 	// Helper functions
 	void ApplyCorrection(const Eigen::Matrix<double,28,1> &x);
 
-	// Saved for calculating keyframe increments form absolute path
+	// Saved for calculating keyframe increments from absolute path
 	Eigen::Vector3d p_kf_v;
 	Eigen::QuaternionAd q_kf_v;
 

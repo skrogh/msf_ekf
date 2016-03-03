@@ -170,6 +170,9 @@ EstimatorFull::EstimatorFull()
 	0, 0, 0, // P_p_w_v
 	0, 0, 0; // P_q_w_v
 	P = P_vec.asDiagonal();
+
+	p_kf_v.setZero();
+	q_kf_v.q.setIdentity();
 }
 
 void
@@ -280,7 +283,7 @@ EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaternio
 	}
 	else
 	{
-		q_c_kf = Eigen::QuaternionAd(q_c_v);
+		q_c_kf.q = q_c_v;
 		p_c_kf = p_c_v;
 	}
 

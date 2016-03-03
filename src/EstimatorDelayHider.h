@@ -10,8 +10,10 @@ namespace ekf
 
 struct imuData_t
 {
-	Eigen::Vector3d omega_m;	// Measured angular velocity in rad/s
-	Eigen::Vector3d a_m;		// Measured acceleration in m/s²
+	Eigen::Vector3d omega_m;		// Measured angular velocity in rad/s
+	Eigen::Vector3d a_m;			// Measured acceleration in m/s²
+	double dist;					// Horisontal distance to ground
+	bool distValid;					// If distance measurement is valid
 	double timeStamp; 				// Time of measurement
 };
 
@@ -65,7 +67,9 @@ public:
 			double timeStamp);
 
 	void ImuMeasurement(const Eigen::Vector3d &omega_m,
-			const Eigen::Vector3d &a_m, double timeStamp); // Return state somehow?
+			const Eigen::Vector3d &a_m,
+			double dist, bool distValid,
+			double timeStamp); // Return state somehow?
 
 
 //protected:
