@@ -224,12 +224,15 @@ EstimatorDelayHider::EstimatorThread(void)
 
 		initialized = true;
 
+		static int i = 0;
+
 		// Do update from camera
 		boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
 		estimatorFull.UpdateCamera(cameraData.p_c_v, cameraData.q_c_v, cameraData.R,
 			absolute, cameraData.isNewKeyframe, Delta_lambda);
+//			absolute, i%120==0, Delta_lambda);
 		
-		static int i = 0;
+		
 		if (i++%1==0)
 		{
 			Eigen::QuaternionAd q_c_kf(cameraData.q_c_v.conjugate() * estimatorFull.q_kf_v.toQuat().conjugate());
@@ -246,7 +249,7 @@ EstimatorDelayHider::EstimatorThread(void)
 	    		<< estimatorFull.GetStateVector().transpose() << " " << estimatorFull.GetCovarianceDiagonal().transpose() << " "
 	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) + estimatorFull.p_w_v ).transpose() * exp(estimatorFull.lambda) << " "
 	    		<< (estimatorFull.q_c_i.toQuat()*estimatorFull.q_i_w.toQuat()*estimatorFull.q_w_v.toQuat()).conjugate().coeffs().transpose() << " "
-	    		<< p_c_v.transpose() << " "
+	    		<< cameraData.p_c_v.transpose() << " " << (estimatorFull.q_c_i.toQuat().toRotationMatrix().transpose()*cameraData.p_c_v).transpose() << " "
 	    		<< std::endl;
 
 		}

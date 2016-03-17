@@ -318,17 +318,6 @@ EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaternio
 	Matrix3d::Zero(),
 	C_q_c_i*C_q_i_w;
 
-	/*Matrix3d::Zero(),
-	Matrix3d::Zero(),
-	-C_q_c_i,
-	Matrix3d::Zero(),
-	Matrix3d::Zero(),
-	Vector3d::Zero(),
-	Matrix3d::Zero(),
-	-Matrix3d::Identity(),
-	Matrix3d::Zero(),
-	-C_q_c_i*C_q_i_w;*/
-
 	Matrix<double,6,28> H;
 	H << H_p, H_q;
 
