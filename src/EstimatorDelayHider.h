@@ -43,8 +43,8 @@ public:
 			double lambda_,
 			const Eigen::Vector3d &p_c_i_,
 			const Eigen::Quaterniond &q_c_i_,
-			const Eigen::Vector3d &p_w_v_,
-			const Eigen::Quaterniond &q_w_v_);
+			const Eigen::Vector3d &p_ikf_w_,
+			const Eigen::Quaterniond &q_ikf_w_);
 	void SetCalibration(double sq_sigma_omega_,
 			double sq_sigma_a_,
 			double sq_sigma_b_omega_,

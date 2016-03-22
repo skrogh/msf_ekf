@@ -40,8 +40,8 @@ public:
 			double lambda_,
 			const Eigen::Vector3d &p_c_i_,
 			const Eigen::Quaterniond &q_c_i_,
-			const Eigen::Vector3d &p_w_v_,
-			const Eigen::Quaterniond &q_w_v_);
+			const Eigen::Vector3d &p_ikf_w_,
+			const Eigen::Quaterniond &q_ikf_w_);
 	void SetCalibration(double sq_sigma_omega_,
 			double sq_sigma_a_,
 			double sq_sigma_b_omega_,
@@ -66,8 +66,8 @@ public:
 	double lambda;
 	Eigen::Vector3d p_c_i;
 	Eigen::QuaternionAd q_c_i;
-	Eigen::Vector3d p_w_v;
-	Eigen::QuaternionAd q_w_v;
+	Eigen::Vector3d p_ikf_w;
+	Eigen::QuaternionAd q_ikf_w;
 
 	// Calibration parameters
 	double sq_sigma_omega;
@@ -80,6 +80,9 @@ public:
 	// Saved for trapetziodal integration
 	Eigen::Vector3d omega_m_old;
 	Eigen::Vector3d a_m_old;
+	Eigen::Vector3d p_i_w_old;
+	Eigen::Vector3d v_i_w_old;
+	Eigen::QuaternionAd q_i_w_old;
 };
 
 class EstimatorFull : public EstimatorPredictor

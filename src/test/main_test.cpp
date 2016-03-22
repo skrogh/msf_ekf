@@ -35,31 +35,33 @@ int
 	ekf::EstimatorFull filter;
 	filter.SetState( Eigen::Vector3d(0, 0, 0), 	// p_i_w
 			Eigen::Vector3d(0,0,0),				// v_i_w
-			Eigen::Quaterniond(1,0,0,0),		// q_i_w
+			Eigen::Quaterniond(1,0.1,0,0),		// q_i_w
 			Eigen::Vector3d(0,0,0),				// b_omega
 			Eigen::Vector3d(0,0,0),				// b_a
 			log(1),								// lambda
-			Eigen::Vector3d(0.045, 0, -0.05),// p_c_i
+//			Eigen::Vector3d(0.045, 0, -0.05),	// p_c_i
+//			Eigen::Quaterniond(0,1,1,0),		// q_c_i
+			Eigen::Vector3d(0.1, 0, 0),	// p_c_i
 			Eigen::Quaterniond(0,1,1,0),		// q_c_i
-			Eigen::Vector3d(0,0,0),				// p_w_v
-			Eigen::Quaterniond(1,0,0,0));		// q_w_v
-	filter.SetCalibration(0.002/400,			// sq_sigma_omega
-			0.05/400,							// sq_sigma_a
-			0.01,							// sq_sigma_b_omega
-			0.01,							// sq_sigma_a_omega
+			Eigen::Vector3d(0,0,0),				// p_ikf_w
+			Eigen::Quaterniond(1,0,0,0));		// q_ikf_w
+	filter.SetCalibration(0.02*0.02,			// sq_sigma_omega
+			0.05*0.05,							// sq_sigma_a
+			0.0001*0.0001,						// sq_sigma_b_omega
+			0.0001*0.0001,						// sq_sigma_a_omega
 			1/400.0,							// Delta_t
 			Eigen::Vector3d(0,0,9.82));			// g
 	Eigen::Matrix<double,28,1> P;
 	P << 0, 0, 0,								// p_i_w
-	0, 0, 0,									// v_i_w
+	0.1, 0.1, 0.1,									// v_i_w
 	0.3, 0.3, 0,								// q_i_w
-	0.5, 0.5, 0.5,								// b_omega
-	1, 1, 1,									// b_a
+	0.01, 0.01, 0.01,								// b_omega
+	0.1, 0.1, 0.1,									// b_a
 	log(2),											// lambda
-	0.005, 0.005, 0.005,							// p_c_i
-	0.05, 0.05, 0.05,								// q_c_i
-	0, 0, 0,									// p_w_v
-	0, 0, 0;									// q_w_v
+	0.01, 0.01, 0.01,							// p_c_i
+	0.01, 0.01, 0.01,								// q_c_i
+	0, 0, 0,									// p_ikf_w
+	0, 0, 0;									// q_ikf_w
 	P = 1*P.cwiseProduct(P);
 	filter.SetCovarianceDiagonal(P);
 	filter.UpdateKeyframe();
@@ -81,7 +83,7 @@ int
 		char tmp;
 		ss
 			>> p_c_v(0) >> tmp >> p_c_v(1) >> tmp >> p_c_v(2) >> tmp
-	    	>> q_c_v.coeffs()(3) >> tmp >> q_c_v.coeffs()(0) >> tmp >> q_c_v.coeffs()(1) >> tmp >> q_c_v.coeffs()(2) >> tmp
+	    	>> q_c_v.w() >> tmp >> q_c_v.x() >> tmp >> q_c_v.y() >> tmp >> q_c_v.z() >> tmp
 	    	>> newKf >> tmp
 	    	>> slamTimeNs;
 
@@ -90,7 +92,7 @@ int
 	    //q_c_v.conjugate();
 
 	    Eigen::QuaternionAd q_c_kf(q_c_v.conjugate() * q_kf_v.toQuat().conjugate());
-	    Eigen::Vector3d p_c_kf = q_kf_v.toQuat().toRotationMatrix() * (p_c_v - p_kf_v);
+	    Eigen::Vector3d p_c_kf = filter.q_kf_v.toQuat().toRotationMatrix() * (p_c_v - filter.p_kf_v);
 		
 
 		// propagate
@@ -110,18 +112,20 @@ int
 		    	>> imuTimeNs;
 		    if (numSlamMeas>1)
 		    {
-		    	Eigen::Matrix3d C_q_w_v = filter.q_w_v.toQuat().toRotationMatrix();
+		    	Eigen::Matrix3d C_q_ikf_w = filter.q_ikf_w.toQuat().toRotationMatrix();
 				Eigen::Matrix3d C_q_i_w = filter.q_i_w.toQuat().toRotationMatrix();
 				Eigen::Matrix3d C_q_c_i = filter.q_c_i.toQuat().toRotationMatrix();
 
+				
 		    	std::cout << filter.p_i_w.transpose() << " " << filter.q_i_w.q.coeffs().transpose() << " "
-		   			<< filter.p_w_v.transpose() << " " << filter.q_w_v.q.coeffs().transpose() << " "
+		   			<< filter.p_ikf_w.transpose() << " " << filter.q_ikf_w.q.coeffs().transpose() << " "
 		    		<< filter.lambda << " " << exp(filter.lambda) << " "
 		    		<< imuTimeNs << " "
 		    		<< slamTimeNs << " "
 		    		<< filter.GetStateVector().transpose() << " " << filter.GetCovarianceDiagonal().transpose() << " "
-		    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(filter.p_i_w + C_q_i_w.transpose()*filter.p_c_i) + filter.p_w_v ).transpose() * exp(filter.lambda) << " "
-		    		<< (filter.q_c_i.toQuat()*filter.q_i_w.toQuat()*filter.q_w_v.toQuat()).conjugate().coeffs().transpose() << " "
+		    		<< p_c_kf.transpose() << " "
+		    		<< (C_q_c_i*( C_q_ikf_w*( filter.p_i_w + C_q_i_w.transpose()*filter.p_c_i - filter.p_ikf_w ) - filter.p_c_i )*exp(filter.lambda)).transpose() << " "
+		    		<< (filter.q_c_i.toQuat()*filter.q_i_w.toQuat()*filter.q_ikf_w.toQuat()).conjugate().coeffs().transpose() << " "
 		    		<< std::endl;
 
 		    		// << " " << filter.P.diagonal().transpose() << std::endl;
@@ -129,7 +133,7 @@ int
 				filter.PropagateCovariance( omega_m, a_m );
 			}
 
-			if ((imuTimeNs+1.0/60.0)>=slamTimeNs)
+			if ((imuTimeNs+0.0/60.0)>=slamTimeNs)
 				break;
 		}
 
@@ -137,13 +141,14 @@ int
 		R.diagonal()[0] = 0.01*0.01;
 		R.diagonal()[1] = 0.01*0.01;
 		R.diagonal()[2] = 0.01*0.01;
-		R.diagonal()[3] = 0.01;
-		R.diagonal()[4] = 0.01;
-		R.diagonal()[5] = 0.01;
+		R.diagonal()[3] = 0.1*0.1;
+		R.diagonal()[4] = 0.1*0.1;
+		R.diagonal()[5] = 0.01*0.01;
 		if ((numSlamMeas%1 == 0)&&(numSlamMeas<60*10000))
 		{
 
-			filter.UpdateCamera(p_c_v, q_c_v, R, true, newKf, 0.001*0.001*log(2)*log(2));
+			filter.UpdateCamera(p_c_v, q_c_v, R, true, newKf, 0*0.001*0.001*log(2)*log(2));
+			//filter.UpdateCamera(p_c_v, q_c_v, R, true, numSlamMeas%50 == 0, 0*0.001*0.001*log(2)*log(2));
 		}
 		//filter.UpdateCamera(Eigen::Vector3d(0,0,0), Eigen::Quaterniond(1,0,0,0), R);
 

@@ -58,12 +58,12 @@ EstimatorDelayHider::SetState(const Eigen::Vector3d &p_i_w_,
 		double lambda_,
 		const Eigen::Vector3d &p_c_i_,
 		const Eigen::Quaterniond &q_c_i_,
-		const Eigen::Vector3d &p_w_v_,
-		const Eigen::Quaterniond &q_w_v_)
+		const Eigen::Vector3d &p_ikf_w_,
+		const Eigen::Quaterniond &q_ikf_w_)
 {
 	boost::mutex::scoped_lock lock(estimatorFullMutex);
 	estimatorFull.SetState( p_i_w_, v_i_w_,	q_i_w_,	b_omega_,
-			b_a_, lambda_, p_c_i_, q_c_i_, p_w_v_, q_w_v_ );
+			b_a_, lambda_, p_c_i_, q_c_i_, p_ikf_w_, q_ikf_w_ );
 }
 
 void
@@ -234,19 +234,19 @@ EstimatorDelayHider::EstimatorThread(void)
 		{
 			Eigen::QuaternionAd q_c_kf(cameraData.q_c_v.conjugate() * estimatorFull.q_kf_v.toQuat().conjugate());
     		Eigen::Vector3d p_c_kf = estimatorFull.q_kf_v.toQuat().toRotationMatrix() * (cameraData.p_c_v - estimatorFull.p_kf_v);
-	    	Eigen::Matrix3d C_q_w_v = estimatorFull.q_w_v.toQuat().toRotationMatrix();
+	    	Eigen::Matrix3d C_q_w_v = estimatorFull.q_ikf_w.toQuat().toRotationMatrix();
 			Eigen::Matrix3d C_q_i_w = estimatorFull.q_i_w.toQuat().toRotationMatrix();
 			Eigen::Matrix3d C_q_c_i = estimatorFull.q_c_i.toQuat().toRotationMatrix();
 
 	    	std::cout << estimatorFull.p_i_w.transpose() << " " << estimatorFull.q_i_w.q.coeffs().transpose() << " "
-	   			<< estimatorFull.p_w_v.transpose() << " " << estimatorFull.q_w_v.q.coeffs().transpose() << " "
+	   			<< estimatorFull.p_ikf_w.transpose() << " " << estimatorFull.q_ikf_w.q.coeffs().transpose() << " "
 	    		<< estimatorFull.lambda << " " << exp(estimatorFull.lambda) << " "
 	    		<< imuData.timeStamp << " "
 	    		<< cameraData.timeStamp << " "
 	    		<< estimatorFull.GetStateVector().transpose() << " " << estimatorFull.GetCovarianceDiagonal().transpose() << " "
-	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) + estimatorFull.p_w_v ).transpose() * exp(estimatorFull.lambda) << " "
-	    		<< (estimatorFull.q_c_i.toQuat()*estimatorFull.q_i_w.toQuat()*estimatorFull.q_w_v.toQuat()).conjugate().coeffs().transpose() << " "
-	    		<< p_c_v.transpose() << " "
+	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) + estimatorFull.p_ikf_w ).transpose() * exp(estimatorFull.lambda) << " "
+	    		<< (estimatorFull.q_c_i.toQuat()*estimatorFull.q_i_w.toQuat()*estimatorFull.q_ikf_w.toQuat()).conjugate().coeffs().transpose() << " "
+	    		<< cameraData.p_c_v.transpose() << " "
 	    		<< std::endl;
 
 		}
