@@ -244,7 +244,7 @@ EstimatorDelayHider::EstimatorThread(void)
 	    		<< imuData.timeStamp << " "
 	    		<< cameraData.timeStamp << " "
 	    		<< estimatorFull.GetStateVector().transpose() << " " << estimatorFull.GetCovarianceDiagonal().transpose() << " "
-	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) + estimatorFull.p_ikf_w ).transpose() * exp(estimatorFull.lambda) << " "
+	    		<< p_c_kf.transpose() << " " << ( C_q_w_v.transpose()*(estimatorFull.p_i_w + C_q_i_w.transpose()*estimatorFull.p_c_i) - estimatorFull.p_ikf_w ).transpose() * exp(estimatorFull.lambda) << " "
 	    		<< (estimatorFull.q_c_i.toQuat()*estimatorFull.q_i_w.toQuat()*estimatorFull.q_ikf_w.toQuat()).conjugate().coeffs().transpose() << " "
 	    		<< cameraData.p_c_v.transpose() << " "
 	    		<< std::endl;
