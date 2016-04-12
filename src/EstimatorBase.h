@@ -93,6 +93,7 @@ public:
 	// void PropagateState(const Eigen::Vector3d &omega_m, const Eigen::Vector3d &a_m); USE SUPERCLASS METHOD
 	void SetCovarianceDiagonal(const Eigen::Matrix<double,28,1> &P_);
 	void PropagateCovariance(const Eigen::Vector3d &omega_m, const Eigen::Vector3d &a_m);
+	void UpdateAltitude( double alt, double s2 );
 	void UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaterniond &q_c_v,
 		const Eigen::Matrix<double,6,6> &R,
 		bool absolute, bool isKeyframe=false, double dLambda=0 );

@@ -212,6 +212,10 @@ EstimatorDelayHider::EstimatorThread(void)
 			{
 				// Lock the estimator object and propagate
 				boost::mutex::scoped_lock lockEstimator(estimatorFullMutex);
+				if ( imuData.distValid )
+				{
+					estimatorFull.UpdateAltitude( imuData.dist, 0.01*0.01 );
+				}
 				estimatorFull.PropagateState( imuData.omega_m, imuData.a_m );
 				estimatorFull.PropagateCovariance( imuData.omega_m, imuData.a_m );
 				lockEstimator.unlock();
@@ -274,7 +278,7 @@ EstimatorDelayHider::EstimatorThread(void)
 	    	double lambda = calcLambda(S_xx, S_yy, S_xy, sigma_x, sigma_y);
 
 	    	// Apply lambda "measurement"
-	   		estimatorFull.lambda = lambda;
+	   		// estimatorFull.lambda = lambda;
 
 	    }
 	    numValidDist = 0;

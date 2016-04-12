@@ -297,6 +297,28 @@ EstimatorFull::PropagateCovariance(const Eigen::Vector3d &omega_m, const Eigen::
 }
 
 void
+EstimatorFull::UpdateAltitude( double alt, double s2 )
+{
+	// Calculate measurement Jacobian
+	Matrix<double,1,28> H;
+	H << 0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0;
+
+	// Calculate residual
+	double r = alt - p_i_w(2);
+	double S = P(2,2) + s2; // H*P*H' = P(2,2)
+	Matrix<double,28,1> K = P.col(2)/S;// P*H' = P.col(2)// (S.ldlt().solve(H*P)).transpose(); // P and S are symmetric
+	Matrix<double,28,1>	x_error = K*r;
+
+	ApplyCorrection( x_error );
+	//Matrix<double,28,28> T = Matrix<double,28,28>::Identity() - K*H;
+	Matrix<double,28,28> T = Matrix<double,28,28>::Identity();
+	T.col(2) -= K;
+	P = T*P*T.transpose() + s2*K*K.transpose();
+
+	// TODO: Mahalanobis gating test
+}
+
+void
 EstimatorFull::UpdateCamera(const Eigen::Vector3d &p_c_v, const Eigen::Quaterniond &q_c_v,
 	const Eigen::Matrix<double,6,6> &R,
 	bool absolute, bool isKeyframe, double dLambda )
